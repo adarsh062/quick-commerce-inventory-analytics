@@ -1,26 +1,25 @@
-# 🛒 Quick-Commerce Inventory & Pricing Analytics
+# Quick-Commerce Inventory Analytics
 
-An end-to-end SQL data analytics project analyzing product inventory, pricing strategies, and stockout patterns across 3,700+ SKUs from a quick-commerce retail platform.
-
----
-
-## 📌 Project Overview
-
-Quick-commerce businesses operate under tight delivery SLAs (10-15 minutes) and rely heavily on optimized dark-store inventory. This project explores real-world catalog and inventory data using **PostgreSQL** to identify revenue leakage from stockouts, assess discount distribution across product categories, and analyze delivery payload constraints.
-
-### Key Objectives:
-- **Database Setup & Modeling**: Design a clean relational schema to store multi-category product catalog data.
-- **In-Database Data Cleansing**: Standardize corrupted price points and unit metrics using SQL DML (`UPDATE`, `DELETE`).
-- **Exploratory Data Analysis (EDA)**: Detect stock availability rates, multi-SKU product variations, and missing data points.
-- **Business Insights**: Formulate analytical SQL queries answering inventory health, pricing, and category profitability questions.
+A SQL project analyzing inventory availability, product pricing, and stockout patterns across 3,700+ retail products using PostgreSQL.
 
 ---
 
-## 📁 Dataset & Schema
+## Project Overview
 
-The dataset represents retail dark-store inventory containing **3,734 records** across various grocery and consumer categories.
+In quick-commerce (10-15 minute delivery), managing store inventory and stock availability is critical to prevent lost sales. 
 
-### Schema Definition (`zepto` table):
+This project uses PostgreSQL to:
+1. Set up and clean a real-world product catalog dataset.
+2. Fix invalid prices and standardize currency units.
+3. Identify out-of-stock products causing potential revenue loss.
+4. Analyze category discounts and classify products by delivery weight.
+
+---
+
+## Database Schema
+
+Table name: `zepto`
+
 ```sql
 CREATE TABLE zepto (
     sku_id SERIAL PRIMARY KEY,
@@ -36,43 +35,44 @@ CREATE TABLE zepto (
 );
 ```
 
-### Data Dictionary:
-| Column | Type | Description |
-| :--- | :--- | :--- |
-| `sku_id` | `SERIAL PRIMARY KEY` | Unique SKU identifier |
-| `category` | `VARCHAR(120)` | Product category (e.g., Fruits & Vegetables, Snacks, Beverages) |
-| `name` | `VARCHAR(150)` | Product title |
-| `mrp` | `NUMERIC(8,2)` | Maximum Retail Price (converted to INR) |
-| `discountPercent` | `NUMERIC(5,2)` | Applied discount percentage |
-| `availableQuantity`| `INTEGER` | Current on-shelf stock count in dark store |
-| `discountedSellingPrice` | `NUMERIC(8,2)` | Actual customer selling price (converted to INR) |
-| `weightInGms` | `INTEGER` | Item weight in grams |
-| `outOfStock` | `BOOLEAN` | Current availability status (`TRUE` / `FALSE`) |
-| `quantity` | `INTEGER` | Pack size or unit count |
+### Column Descriptions
+
+- `sku_id`: Unique identifier for each product.
+- `category`: Product category (e.g., Fruits and Vegetables, Snacks, Beverages).
+- `name`: Product name.
+- `mrp`: Maximum Retail Price (in Rupees).
+- `discountPercent`: Discount percentage.
+- `availableQuantity`: Units available in stock.
+- `discountedSellingPrice`: Final selling price (in Rupees).
+- `weightInGms`: Product weight in grams.
+- `outOfStock`: Stock status (TRUE = out of stock, FALSE = in stock).
+- `quantity`: Pack size or quantity.
 
 ---
 
-## 🧹 Data Cleaning (SQL DML)
+## Data Cleaning
 
-1. **Purged Zero-Value Records**:
-   ```sql
-   DELETE FROM zepto
-   WHERE mrp = 0;
-   ```
+Before analysis, two cleaning steps were executed using SQL:
 
-2. **Currency Unit Standardization (Paise to INR)**:
-   ```sql
-   UPDATE zepto
-   SET mrp = mrp / 100.0,
-       discountedSellingPrice = discountedSellingPrice / 100.0;
-   ```
+### 1. Delete rows with zero price
+```sql
+DELETE FROM zepto
+WHERE mrp = 0;
+```
+
+### 2. Convert price from paise to rupees
+```sql
+UPDATE zepto
+SET mrp = mrp / 100.0,
+    discountedSellingPrice = discountedSellingPrice / 100.0;
+```
 
 ---
 
-## 📊 Key Business Analysis & Queries
+## Key SQL Queries and Analysis
 
-### 1. High-Value Lost Revenue (Stockout Analysis)
-Identify premium products (MRP > ₹300) currently out of stock to flag immediate restocking priorities:
+### 1. High-Value Out-of-Stock Products
+Find expensive products (MRP > 300) that are currently out of stock:
 ```sql
 SELECT DISTINCT name, mrp
 FROM zepto
@@ -80,8 +80,8 @@ WHERE outOfStock = TRUE AND mrp > 300
 ORDER BY mrp DESC;
 ```
 
-### 2. Category-Level Inventory Valuation
-Calculate total estimated on-shelf revenue currently held in stock per product category:
+### 2. Estimated Revenue per Category
+Calculate total inventory value currently held in stock for each category:
 ```sql
 SELECT 
     category,
@@ -91,8 +91,8 @@ GROUP BY category
 ORDER BY total_revenue DESC;
 ```
 
-### 3. Promotional Distribution by Category
-Identify categories with the highest average discounts to understand promotional loss leaders:
+### 3. Top 5 Categories with Highest Average Discount
+Identify categories offering the highest average discounts:
 ```sql
 SELECT 
     category,
@@ -103,8 +103,8 @@ ORDER BY avg_discount DESC
 LIMIT 5;
 ```
 
-### 4. True Value Analysis (Price per Gram)
-Find cost-efficiency across products weighing at least 100g:
+### 4. Value for Money (Price per Gram)
+Calculate price per gram for items weighing 100 grams or more:
 ```sql
 SELECT DISTINCT 
     name, 
@@ -116,8 +116,8 @@ WHERE weightInGms >= 100
 ORDER BY price_per_gram ASC;
 ```
 
-### 5. Delivery Payload Segmentation
-Segment products into weight classes to help rider dispatch manage payload limits:
+### 5. Delivery Weight Segmentation
+Group products into weight buckets to help plan rider bag load:
 ```sql
 SELECT DISTINCT 
     name, 
@@ -132,31 +132,28 @@ FROM zepto;
 
 ---
 
-## 📈 Key Findings & Insights
+## Key Findings
 
-- **Stockout Impact**: Several high-MRP items (> ₹300) in personal care and packaged food had frequent stockouts, creating direct revenue leakage.
-- **Discount Patterns**: Packaged snacks and beverages exhibited the highest promotional discounts (~15-18%) to drive repeat order frequency.
-- **Inventory Weight Concentration**: Heavy staple categories (e.g., Atta, Rice, Beverages) accounted for the majority of warehouse storage load, requiring dedicated rider allocation for bulk deliveries.
+- **Revenue Loss from Stockouts**: Several high-priced products (above 300) were out of stock, resulting in missed sales.
+- **Discount Patterns**: Snacks and Beverages had higher average discounts compared to fresh produce and dairy.
+- **Delivery Planning**: Heavy items (over 5 kg) need special handling or multiple delivery trips to stay within rider weight limits.
 
 ---
 
-## 🛠️ How to Run Locally
+## How to Run This Project
 
-1. **Clone the repository**:
+1. Clone this repository:
    ```bash
-   git clone https://github.com/<your-username>/quick-commerce-inventory-analytics.git
+   git clone https://github.com/adarsh062/quick-commerce-inventory-analytics.git
    cd quick-commerce-inventory-analytics
    ```
 
-2. **Database Setup**:
-   - Open PostgreSQL (pgAdmin / DBeaver / psql CLI).
-   - Execute the table creation script in `Zepto_SQL_data_analysis.sql`.
-   - Import `zepto_v2.csv` into the `zepto` table.
-
-3. **Execute Analysis**:
-   - Run the data cleaning updates followed by the analytical queries in `Zepto_SQL_data_analysis.sql`.
+2. Open PostgreSQL (pgAdmin or command line).
+3. Run the table creation and cleaning queries from `Zepto_SQL_data_analysis.sql`.
+4. Import `zepto_v2.csv` into the `zepto` table.
+5. Run the analysis queries.
 
 ---
 
-## 📜 License
+## License
 MIT License
